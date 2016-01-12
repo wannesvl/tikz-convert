@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# tikz-convert -- A helper script to convert tikz drawings to pdf, png or eps
+# tikz-convert -- A helper script to convert tikz drawings to pdf, png, eps or mp4
 # Copyright (C) 2013 Wannes Van Loock. All rights reserved.
 # Copyright (C) 2016 Niels van Duijkeren.
 #
