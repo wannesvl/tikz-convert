@@ -2,7 +2,7 @@
 
 # tikz-convert -- A helper script to convert tikz drawings to pdf, png or eps
 # Copyright (C) 2013 Wannes Van Loock. All rights reserved.
-# Copyright (C) 2016 - Niels van Duijkeren
+# Copyright (C) 2016 Niels van Duijkeren.
 #
 # tikz-convert is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
