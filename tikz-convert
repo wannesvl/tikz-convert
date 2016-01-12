@@ -226,9 +226,13 @@ if __name__ == "__main__":
                             "-pix_fmt", "yuv420p",
                             basename+".mp4"]
                 ffmpeg = subprocess.call(' '.join(command),shell=True)
+                if ffmpeg:
+                    sys.stdout.write("convertTikz: ERROR generating video\n")
                 # Remove individual .png frames
                 sys.stdout.write("convertTikz: Deleting temporary files\n")
                 fnd = subprocess.call("find . -regextype sed -regex \'./vid-"+basename+"_[0-9]\{4\}.png\' -delete",shell=True)
+                if fnd:
+                    sys.stdout.write("convertTikz: ERROR removing temporary png files\n")
                 sys.stdout.write("convertTikz: Done!\n")
             else:
                 sys.stdout.write("convertTikz: ERROR generating video, n basename found for Tikz files in specified directory, cannot generate a video, please make sure files match the pattern \'basename_%04d.tikz\'\n")
