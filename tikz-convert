@@ -1,7 +1,8 @@
 #!/usr/bin/python
 
-# tikz-convert -- A helper script to convert tikz drawings to pdf, png or eps
+# tikz-convert -- A helper script to convert tikz drawings to pdf, png, eps or mp4
 # Copyright (C) 2013 Wannes Van Loock. All rights reserved.
+# Copyright (C) 2016 Niels van Duijkeren.
 #
 # tikz-convert is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -44,7 +45,7 @@ def convertTikz(pathToFile, outputformat="pdf", once="true", density=300,
     texName = tikzName + ".tex"
     pdfName = tikzName
     tempFiles = [tikzName + '.' + ext for ext in ['tex', 'aux', 'bcf', 'fls', 'idx', 'ind', 'lof', 'lot',  'out', 'toc', 'fdb_latexmk', 'run.xml', 'log', 'pyg']]
-    # Create a template    
+    # Create a template
     with open(pathToFile) as tikzFile:
         mainDoc = tikzFile.readline()
     if root:
@@ -59,14 +60,14 @@ def convertTikz(pathToFile, outputformat="pdf", once="true", density=300,
                     '\\pgfplotsset{compat=newest}',
                     '\\usepackage[graphics, tightpage, active]{preview}',
 		    '\\usepackage{tikz-3dplot}',
-                    '\\PreviewEnvironment{tikzpicture}', 
-                    '\\begin{document}', r'\input{%s}', 
+                    '\\PreviewEnvironment{tikzpicture}',
+                    '\\begin{document}', r'\input{%s}',
                     '\\end{document}'])
-    
+
     # Write tex file
     texInputFile = "\"" + pathToFile + "\""
     with open(texName,"w") as texfile:
-        texfile.write(template % texInputFile.replace("\\","/"))  
+        texfile.write(template % texInputFile.replace("\\","/"))
     out = tempfile.TemporaryFile()
     # Compile tex file
     if once:
@@ -94,7 +95,7 @@ def convertTikz(pathToFile, outputformat="pdf", once="true", density=300,
                                   tikzName], stdout = None)
         except KeyboardInterrupt:
             pass
-    
+
     # Convert to other formats
     if "eps" in outputformat:
         sys.stdout.write("convertTikz: Converting pdf to eps\n")
@@ -112,7 +113,7 @@ def convertTikz(pathToFile, outputformat="pdf", once="true", density=300,
                 del epsLines[1]
             with open(tikzName + ".eps","w") as epsFile:
                 epsFile.writelines(epsLines)
-            sys.stdout.write("convertTikz: Successfully generated eps file \n")        
+            sys.stdout.write("convertTikz: Successfully generated eps file \n")
     if "png" in outputformat:
         sys.stdout.write("convertTikz: Converting pdf to png\n")
         sys.stdout.write("convertTikz: WARNING conversion requires convert"
@@ -122,24 +123,33 @@ def convertTikz(pathToFile, outputformat="pdf", once="true", density=300,
             shell=True)
         if topng:
             sys.stdout.write("convertTikz: ERROR generating png file\n")
+    if "vid-png" in outputformat:
+        sys.stdout.write("convertTikz: Converting pdf to png-frames for video\n")
+        sys.stdout.write("convertTikz: WARNING conversion requires convert"
+                         "requires \"convert\"\n")
+        topng = subprocess.call(
+            "convert -alpha remove -density %d %s.pdf PNG32:vid-%s.png" %(density,pdfName,tikzName),
+            shell=True)
+        if topng:
+            sys.stdout.write("convertTikz: ERROR generating png file\n")
 
     # Remove temp files
     sys.stdout.write("convertTikz: Deleting temporary files\n")
     for tf in tempFiles:
         if os.path.isfile(tf):
             os.remove(tf)
-    
+
     sys.stdout.write("convertTikz: Done!\n")
 
 
 if __name__ == "__main__":
-    usage = ("usage: %prog [options] arg. If arg is a foldername," 
-            "the entire folder is scanned for *.tikz files and all are"
-            "converted to pdf")
+    usage = ("usage: %prog [options] arg. If arg points to a directory,"
+            "the entire directory is scanned for *.tikz files and all are"
+            "processed")
     op = optparse.OptionParser(usage=usage)
     op.add_option("-o", "--once", action = "store_true",
                   dest = "once", default = False,
-                  help = "only convert once, then clean up temporary files "
+                  help = "Only convert once, then clean up temporary files "
                          "and quit")
     op.add_option("-e","--eps", action="store_true",
                   dest = "eps",default=False,
@@ -150,6 +160,19 @@ if __name__ == "__main__":
                   help = "Creates an image of PNG dpi in png format for use on "
                          "e.g. websites. \"Convert\" must be available on your "
                          "system in order to use this option!")
+    op.add_option("-m","--mp4", action="store_true",
+                  dest = "mp4",default=False,
+                  help = "Create a video from a sequence of Tikz images for use "
+                         "on e.g. websites. Creating a video only works in case "
+                         "arg points to a directory. The individual Tikz filenames "
+                         "start with a base file name and a counter taking 4 "
+                         "decimal places starting from 0000. For example: "
+                         "name_0000.tikz, name_0001.tikz, etc. \"Convert\" and "
+                         "\"ffmpeg\" must be available on your system in order "
+                         "to use this option!")
+    op.add_option("-f","--fps",
+                  dest = "fps",type="int",default = 10,
+                  help = "Frame rate for the generated video")
     op.add_option("-d","--density",
                   dest = "density",type="int",default = 300,
                   help = "The resolution in dpi of the resulting png")
@@ -158,24 +181,58 @@ if __name__ == "__main__":
 
     options, args = op.parse_args()
     args = args[0].replace("/",os.sep)
-    
-    if options.eps and options.png:
-        outputformat = ("pdf","eps","png")
-    elif options.eps:
-        outputformat = ("pdf","eps")
-    elif options.png:
-        outputformat = ("pdf","png")
-    else:
-        outputformat = ("pdf")
+
+    outputformat = ("pdf",)
+    gen_video = False
+    if options.eps:
+        outputformat += ("eps",)
+    if options.png:
+        outputformat += ("png",)
+    if options.mp4:
+        outputformat += ("vid-png",)
+        gen_video = True
 
     if os.path.isfile(args):
         # Change argument to absolute path for compileTikz function
         convertTikz(os.path.join(os.getcwd(),args), outputformat, options.once,
                     options.density)
     elif os.path.isdir(args):
+        basename_found = False
+        basename_re = re.compile('(\w+)_\d{4}.tikz')
+        basename = ""
         for dirs, names, filenames in os.walk(args):
             for fi in filenames:
                 if fi.endswith(".tikz"):
+                    if basename_re.match(fi):
+                        if not basename_found:
+                            # Base name is filename except _%04d.tikz
+                            basename = basename_re.sub(r'\1',fi)
+                            basename_found = True
+                    elif gen_video:
+                        sys.stdout.write("convertTikz: (One of) input Tikz file(s) do(es) not match pattern \'basename_%04d.tikz\', ffmpeg may fail\n")
                     # Give absolute path to compileTikz
                     convertTikz(os.path.join(os.getcwd(),dirs,fi), outputformat,
                                 True, options.density)
+        if gen_video:
+            if basename_found:
+                sys.stdout.write("convertTikz: Generating video\n")
+                # Generate video from .png frames
+                command = ["ffmpeg",
+                            "-y",
+                            "-r", str(options.fps),
+                            "-i", "vid-"+basename+"_%04d.png",
+                            "-c:v", "libx264",
+                            "-an",
+                            "-pix_fmt", "yuv420p",
+                            basename+".mp4"]
+                ffmpeg = subprocess.call(' '.join(command),shell=True)
+                if ffmpeg:
+                    sys.stdout.write("convertTikz: ERROR generating video\n")
+                # Remove individual .png frames
+                sys.stdout.write("convertTikz: Deleting temporary files\n")
+                fnd = subprocess.call("find . -regextype sed -regex \'./vid-"+basename+"_[0-9]\{4\}.png\' -delete",shell=True)
+                if fnd:
+                    sys.stdout.write("convertTikz: ERROR removing temporary png files\n")
+                sys.stdout.write("convertTikz: Done!\n")
+            else:
+                sys.stdout.write("convertTikz: ERROR generating video, n basename found for Tikz files in specified directory, cannot generate a video, please make sure files match the pattern \'basename_%04d.tikz\'\n")
